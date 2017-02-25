@@ -61,7 +61,7 @@ export const MD_AUTOCOMPLETE_VALUE_ACCESSOR: any = {
     '[attr.aria-owns]': 'autocomplete?.id',
     '(focus)': 'openPanel()',
     '(blur)': '_handleBlur($event.relatedTarget?.tagName)',
-    '(input)': '_handleInput($event.target.value)',
+    '(input)': '_handleInput($event)',
     '(keydown)': '_handleKeydown($event)',
   },
   providers: [MD_AUTOCOMPLETE_VALUE_ACCESSOR]
@@ -153,15 +153,15 @@ export class MdAutocompleteTrigger implements AfterContentInit, ControlValueAcce
    */
   get panelClosingActions(): Observable<MdOptionSelectEvent> {
     return Observable.merge(
-        ...this.optionSelections,
+        this.optionSelections,
         this._blurStream.asObservable(),
         this._keyManager.tabOut
     );
   }
 
   /** Stream of autocomplete option selections. */
-  get optionSelections(): Observable<MdOptionSelectEvent>[] {
-    return this.autocomplete.options.map(option => option.onSelect);
+  get optionSelections(): Observable<MdOptionSelectEvent> {
+    return Observable.merge(...this.autocomplete.options.map(option => option.onSelect));
   }
 
   /** The currently active option, coerced to MdOption type. */
@@ -213,9 +213,14 @@ export class MdAutocompleteTrigger implements AfterContentInit, ControlValueAcce
     }
   }
 
-  _handleInput(value: string): void {
-    this._onChange(value);
-    this.openPanel();
+  _handleInput(event: KeyboardEvent): void {
+    // We need to ensure that the input is focused, because IE will fire the `input`
+    // event on focus/blur/load if the input has a placeholder. See:
+    // https://connect.microsoft.com/IE/feedback/details/885747/
+    if (document.activeElement === event.target) {
+      this._onChange((event.target as HTMLInputElement).value);
+      this.openPanel();
+    }
   }
 
   _handleBlur(newlyFocusedTag: string): void {
